@@ -1,1 +1,1 @@
-# EDA-Data-Visulation-of-Crime-Dataset
+# EDA-Data-Visualisation-of-Crime-Dataset
