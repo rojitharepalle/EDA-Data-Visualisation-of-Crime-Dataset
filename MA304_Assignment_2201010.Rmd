@@ -1,0 +1,323 @@
+---
+title: "MA304_Assignment"
+author: "Rojitha Repalle - 2201010"
+date: "26-04-2023"
+subtitle: Analysis of police dataset
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+```
+
+# Introduction
+
+The given Incident dataset is chosen for the "Exploratory Data Analysis and Data Viualization" coursework. Major Insights are drawn from the dataset after preparing and pre-processing of the dataset. The insights are shown in the form of bar charts, pie charts, Histogram, box plot, scatter plot, correlation analysis etc.
+
+# R Markdown
+
+The necessary libraries are imported in order to perform the operations on the given dataset.
+
+```{r, echo=FALSE,warning=FALSE,message=FALSE}
+#importing required libraries
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+library(plotly)
+library(gridExtra)
+library(ggrepel)
+library(naniar)
+library(lubridate)
+library(rgdal)
+library(RColorBrewer)
+library(leaflet)
+library(ggcorrplot)
+library(corrplot)
+
+
+
+```
+
+The given dataset is loaded by calling read.csv function
+
+```{r, echo=FALSE,warning=FALSE,message=FALSE}
+# Reading dataset
+incidents<-read.csv('C:/Users/HP/Downloads/37-00049_UOF-P_2016_prepped.csv')
+```
+
+The dataset is viewed by calling the view function and it contains overall 2834 rows and 47 columns.
+
+```{r, echo=FALSE,warning=FALSE,message=FALSE}
+#viewing the dataset and number of rows and columns by calling dim(dataframe) function. 
+view(incidents)
+```
+The first two columns in the given dataset contains the same reference as labels, so  second column is removed as it contains the same data as column 1, which does not make any difference. The number of columns and rows are checked after removing the column.
+
+```{r, echo=FALSE,warning=FALSE,message=FALSE}
+#removing second column from the dataset
+incidents = incidents[-1,]
+dim(incidents) #checking the col and rows again
+```
+
+
+Converting null values in the dataset to NAs
+
+``` {r, echo=FALSE,warning=FALSE,message=FALSE}
+#convert null values to NA
+incidents[incidents == ""] = NA
+
+
+
+```
+
+
+
+
+
+
+## Pie Graph
+
+The pie graph depicts the share of each race in crime scenes. It is noted that Black race is more involved in the crime incident with 1333 incidents, followed by Hispanic with 524, and then White with 470. The least participation in incident is Asian with just 1 incident recorded.
+
+```{r, echo=FALSE,warning=FALSE,message=FALSE}
+
+incidents_SubRace <-  incidents %>%
+  group_by(SUBJECT_RACE) %>%
+  summarize(count = n())
+
+incidents_SubRace <- incidents_SubRace %>%
+  arrange(desc(SUBJECT_RACE)) %>%
+  mutate(lab.ypos = cumsum(count) - 0.5*count)
+
+p1 <- ggplot(incidents_SubRace, aes(x = "", y = count, fill = SUBJECT_RACE)) +
+  geom_bar(width = 1, stat = "identity", color = "black") +
+  coord_polar("y", start = 0)+
+  geom_text(aes(y = lab.ypos, label = count), color = "black")+
+  scale_fill_brewer(palette = "YlGnBu", direction=-1) +
+  ggtitle("Number of Crime incidents reported by each  Race")+
+  theme_void()
+
+p1
+
+
+```
+
+
+
+## Bar Chart
+
+The below bar chart shows the count of officer's race with respect to subject race.The white race officers have arrested most of the black race subjects and least arrested American Ind.
+
+
+``` {r, echo=FALSE,warning=FALSE,message=FALSE}
+#plotting graph to view the count of officers race w.r.t. subject's race
+ggplot(incidents, aes(x = OFFICER_RACE, fill = SUBJECT_RACE)) +
+  geom_bar(position = "dodge") +
+  labs(x = "Officer race", y = "Number of Arrests", fill = "Subject Race") +
+  scale_fill_brewer(palette = "Spectral") +
+  theme(legend.title = element_text(size = 12))
+
+```
+
+
+## Histogram 
+
+The Histogram below shows the number of years the officers were in force. As seen in the histogram, it is seen that most of the officers (approx 600) are new, and there are only a few officers whose service was more than 30 years.
+
+```{r, echo=FALSE,warning=FALSE,message=FALSE}
+#plotting histogram to view the number of years the officers were on force
+ggplot(incidents, aes(x = as.numeric(OFFICER_YEARS_ON_FORCE))) +
+  geom_histogram(fill = "yellow", color = "black", bins = 10) +
+  labs(x = "Officer years on force", y = "Number of Officers", title = " Number of Officers on Force")
+
+
+```
+
+
+
+
+## Heat Map
+
+The heat map demonstrates the subject_race who got arrested by a officer_race, it shows that the white officer have arrested around 846 black subject being the most, and the least arrested was Asian and American Ind subject.
+
+```{r, echo=FALSE,warning=FALSE,message=FALSE}
+
+frequency <- incidents %>%
+  group_by(SUBJECT_RACE, OFFICER_RACE) %>%
+  summarize(Freq=n())
+hetm <- ggplot(frequency, aes(x = SUBJECT_RACE, y = OFFICER_RACE, fill = Freq )) +scale_fill_gradientn(colors = hcl.colors(20, "YlGnBu")) +geom_tile()
+ggplotly(hetm)
+
+```
+
+
+
+
+
+
+
+
+
+### Date and Time Formatting to view the data clearly in the upcoming plots
+
+```{r, echo=FALSE,warning=FALSE,message=FALSE}
+
+#Formatting date
+incidents$INCIDENT_DATE <- as.Date(incidents$INCIDENT_DATE, format = "%m/%d/%Y" )
+incidents$INCIDENT_DATE <- gsub("00","20",incidents$INCIDENT_DATE)
+incidents$INCIDENT_DATE <- as.Date(incidents$INCIDENT_DATE, format = "%Y-%m-%d")
+
+#Formatting Time
+incidents$INCIDENT_TIME <- format(strptime(incidents$INCIDENT_TIME, "%I:%M:%S %p"), "%H:%M:%S")
+incidents$INCIDENT_MONTH <- months(as.Date(incidents$INCIDENT_DATE))
+incidents$INC_MONTH <-format(incidents$INCIDENT_DATE,"%m")
+incidents$INCIDENT_HOUR <- as.numeric(substr(incidents$INCIDENT_TIME, 0, 2))
+incidents$INCIDENT_DAY <- wday(incidents$INCIDENT_DATE, label=TRUE)
+incidents$INC_HOUR <- substr(incidents$INCIDENT_TIME, 0, 2)
+incidents$INC_DATE <- substr(incidents$INCIDENT_DATE, 9, 10)
+
+
+incidents_year <-  incidents %>%
+  group_by(INCIDENT_DATE,INCIDENT_MONTH,INCIDENT_DAY) %>%
+  summarize(count = n())
+
+incidents_month <-  incidents %>%
+  group_by(INC_MONTH) %>%
+  summarize(count = n())
+
+incidents_day <-  incidents %>%
+  group_by(INCIDENT_DAY,INCIDENT_HOUR) %>%
+  summarize(count = n())
+
+incidents$INC_HOUR <- substr(incidents$INCIDENT_TIME, 0, 2)
+
+incidents_time <-incidents
+incidents_time <- incidents_time%>% dplyr::filter(!is.na(INCIDENT_TIME))
+incidents_time$INC_HOUR <- substr(incidents_time$INCIDENT_TIME, 0, 2)
+incidents_time   %>% group_by(INC_HOUR) %>%
+  summarize(avg =n()) -> incidents_hour_n
+
+```
+
+## Interactive plot
+An interactive plot is drawn, while smoothing the variation and noise in the data. The main purpose of drwaing this line was to estimate and plot a trend that gives the relationship between two variables 'incident counts' in particular 'months'
+
+```{r, echo=FALSE,warning=FALSE,message=FALSE}
+c1 <- ggplot(data = incidents_year, aes(INCIDENT_DATE, count)) +   geom_line(size=0.25, col="gray") +
+  geom_smooth(method = "loess", color = "purple", span = 1/10) + theme_bw() + labs(x="Months ", y= "INCIDENT COUNTS", title=" Incidents w.r.t. Months")
+ggplotly(c1)
+
+```
+## Interactive plot
+The interactive plotted using plotly shows the incidents rates in the hours of a day in the year 2016. It shows as you hover the mouse over the graph. It can be seen that the hour 20:00 have the highest average incident rate of 181, whereas 07 month has the least avearge incident rate of 20.
+
+```{r, echo=FALSE,warning=FALSE,message=FALSE}
+r1 <- ggplot(incidents_hour_n, aes(x = INC_HOUR, y = avg, group = "count")) + geom_line( size = 1, colour = "orange") + labs(x="HOURS IN A DAY", y= "INCIDENT COUNTS", title="Incident Rates w.r.t. Hours")+ theme_bw() +
+  theme(axis.text.x=element_text(angle=-90, vjust=0.5)) +
+  
+  labs(x = "Hour of the day", y = "incident count") + theme_bw()
+ 
+
+ggplotly(r1)
+
+
+```
+
+
+## Density Plot
+
+Interactive Density plot for the incident distribution is shown. The density function shows the distribution of incidents across the density. The density is shown for the number of incidents.
+
+```{r, echo=FALSE,warning=FALSE,message=FALSE}
+
+r2 <- ggplot(incidents_year, aes(count)) +
+  geom_density(alpha = 0.5, colour = "light green", fill ="light green")+ labs(x="Incident counts", y= "Density", title=" Distribuion of incident rates") + theme_bw()
+ggplotly(r2)
+
+```
+
+
+
+## Box Plot
+The box plots shows the number of officers who got injured in their years of force. 36 officers who are in the force for more than 30 years are injured. The median of injured is seen as 7.5 years of service of officers.
+
+
+```{r, echo=FALSE,warning=FALSE,message=FALSE}
+
+box_graph <- as.numeric(incidents$OFFICER_YEARS_ON_FORCE)
+box_2 <- ggplot(incidents, aes(x=OFFICER_INJURY, y=box_graph)) + xlab("Officer injury") + ylab("Officer years on force")
+Box_final <-box_2 + geom_boxplot(fill="pink", alpha=0.5)+ theme_bw() +
+theme(axis.text=element_text(face='bold', size = 10, angle = 36, hjust = 2))
+ggplotly(Box_final)
+
+
+```
+
+
+
+## Map
+
+The geographical map shows the exact location with lattitude and longitude of where the incidents happened along with the reason and the current situation of the subject whether arrested or accidental discharge, etc.
+
+```{r, echo=FALSE,warning=FALSE,message=FALSE}
+
+pal <- 
+   colorFactor(palette = "Spectral", 
+               levels = incidents$INCIDENT_REASON)
+leaflet() %>%
+  addTiles() %>%
+  addCircleMarkers(data = incidents , lng=as.numeric(incidents$LOCATION_LONGITUDE), lat=as.numeric(incidents$LOCATION_LATITUDE), popup = ~(incidents$INCIDENT_REASON),color = ~pal(incidents$INCIDENT_REASON),) %>% 
+addLegend(pal = pal, 
+            values = unique(incidents$INCIDENT_REASON),
+            # opacity of .75, title of Sector, and position of topright
+            opacity = 0.75, title = "Subject Race", position = "topright")
+
+```
+
+
+
+
+
+
+### The bar chart is plotted to show the percentage of crimes by race. 
+
+The bar chart shows the % of crimes by race. It is observed that black race subject is more involved in crime with 55.91%, followed by hispanic with 21.98% and least interacted is CitiRace and American Ind with only 0.04%. 
+
+```{r, echo=FALSE,warning=FALSE,message=FALSE}
+
+#Race percentage of crimes
+
+incidents %>%
+  filter(!is.na(SUBJECT_RACE)) %>%
+  group_by(SUBJECT_RACE) %>%
+  summarise(Count = n()) %>%
+  mutate(TotalCount = nrow(incidents)) %>%
+  mutate(Percentage = (Count/TotalCount) * 100) %>%
+  arrange(desc(Count)) %>%
+  ungroup() %>%
+  mutate(SUBJECT_RACE = reorder(SUBJECT_RACE,Count)) %>%
+  ggplot(aes(x = SUBJECT_RACE, y = Percentage)) +
+  geom_bar(stat = 'identity', fill = '#2c7bb6', colour = "#FFFFFF") +
+  geom_text(aes(x = SUBJECT_RACE, y = 1, label = paste0("(", round(Percentage, 2), " % )", sep = "")),
+            hjust = 0, vjust = .5, size = 4, colour = '#d7191c', fontface = 'bold') +
+  labs(x = 'Subject Race', y = 'Percentage of crime incidents', title = 'CRIME INCIDENT % w.r.t. SUBJECT RACE') +
+  coord_flip() +
+  theme_classic()
+
+
+```
+
+
+
+# Conclusion
+
+By visulaizing and Analyzing the Policing data, the analysis of dataset was hard because it was having a missing values, so the dataset is cleaned and preprocessed. A lot of racial aspects is understood that black race subject have reportedly interacted in most of the crimes and got arrested by white race officers. The American Ind and Asian were least interacted in the incidents and got arrested. 
+
+
+
+References :
+
+https://moderndive.netlify.app/2-viz.html#geomboxplot
+
+
